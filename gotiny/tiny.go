@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
 	"math/rand"
@@ -8,13 +9,36 @@ import (
 	"time"
 )
 
-var urlsMap map[string]string
+// Storage represent url shortener storage
+type Storage interface {
+	Set(short, full string)
+	Get(short string) (string, error)
+}
+
+type urlStorage struct {
+	urlsMap map[string]string
+}
+
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_")
 
 // Page contains the data for template rendering
 type Page struct {
 	// Url is the shortened URL
 	URL string
+}
+
+var storage urlStorage
+
+func (s *urlStorage) Set(short, full string) {
+	s.urlsMap[short] = full
+}
+
+func (s *urlStorage) Get(short string) (string, error) {
+	full, ok := s.urlsMap[short]
+	if !ok {
+		return "", fmt.Errorf("No key found")
+	}
+	return full, nil
 }
 
 func randString(n int) string {
@@ -37,7 +61,7 @@ func handleShorten(w http.ResponseWriter, r *http.Request) {
 	}
 
 	randStr := randString(32)
-	urlsMap[randStr] = urls[0]
+	storage.Set(randStr, urls[0])
 
 	p := Page{URL: randStr}
 
@@ -62,9 +86,13 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Redirecting to: %s", urlsMap[qs[0]])
+	fullURL, err := storage.Get(qs[0])
+	if err != nil {
+		log.Print("No url found in store")
+	}
+	log.Printf("Redirecting to: %s", fullURL)
 	w.WriteHeader(303)
-	http.Redirect(w, r, urlsMap[qs[0]], http.StatusSeeOther)
+	http.Redirect(w, r, fullURL, http.StatusSeeOther)
 }
 
 func handleMain(w http.ResponseWriter, r *http.Request) {
@@ -87,5 +115,5 @@ func main() {
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
-	urlsMap = make(map[string]string)
+	storage.urlsMap = make(map[string]string)
 }
