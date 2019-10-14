@@ -91,7 +91,6 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 		log.Print("No url found in store")
 	}
 	log.Printf("Redirecting to: %s", fullURL)
-	w.WriteHeader(303)
 	http.Redirect(w, r, fullURL, http.StatusSeeOther)
 }
 
